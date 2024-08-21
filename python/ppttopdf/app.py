@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import os
-from pptx import Presentation
-from io import BytesIO
+from werkzeug.utils import secure_filename
+import win32com.client  # Requires pywin32
+import pythoncom
 
 app = Flask(__name__)
 
@@ -10,13 +11,13 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def convert_ppt_to_pdf(ppt_file_path):
     try:
-        ppt = Presentation(ppt_file_path)
-        pdf_file_path = ppt_file_path[:-4] + '.pdf'
-        prs_stream = BytesIO()
-        ppt.save(prs_stream)
-        prs_stream.seek(0)
-        with open(pdf_file_path, 'wb') as f:
-            f.write(prs_stream.read())
+        pythoncom.CoInitialize()  # Initialize COM for this thread
+        powerpoint = win32com.client.Dispatch("PowerPoint.Application")
+        presentation = powerpoint.Presentations.Open(ppt_file_path, WithWindow=False)
+        pdf_file_path = ppt_file_path.rsplit('.', 1)[0] + '.pdf'
+        presentation.SaveAs(pdf_file_path, FileFormat=32)  # 32 = ppSaveAsPDF
+        presentation.Close()
+        powerpoint.Quit()
         return pdf_file_path, None
     except Exception as e:
         return None, str(e)
